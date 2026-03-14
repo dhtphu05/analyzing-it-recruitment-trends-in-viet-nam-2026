@@ -1,105 +1,152 @@
 # Phan cong cong viec trong nhom
 
-Tai lieu nay dung de nop kem hoac dua vao slide/notebook de mo ta ro ai phu trach phan nao trong du an.
+Tai lieu nay dung de thong nhat vai tro, dau ra va cach moi thanh vien trinh bay trong luc bao cao.
 
-## Tong quan de tai
+## Muc tieu chung
 
-De tai: Phan tich va du bao xu huong tuyen dung IT tai Viet Nam.
+Ca nhom phai nop mot folder co:
 
-Muc tieu giai doan giua ky:
+- `README.md`
+- `raw data/`
+- `clean data/`
+- notebook trinh bay bai lam
+- ma nguon crawl va xu ly
 
-- Thu thap du lieu tu crawl tu cac nen tang tuyen dung.
-- Lam sach, chuan hoa, ma hoa du lieu.
-- Phan tich mo ta va truc quan hoa de danh gia tinh kha thi cua bai toan.
-- Chua di sau vao modeling, chi danh gia kha nang xay dung mo hinh cho bai tap sau.
+Tat ca du lieu phai la du lieu nhom **tu crawl**, so mau phai **> 1000**, va notebook phai co day du phat bieu bai toan, cleaning, truc quan hoa, nhan xet va ket luan.
 
 ## Thanh vien 1 - Data Engineer
 
-### Nhiem vu chinh
+### Cong viec phai lam
 
-- Thiet ke crawler cho ITViec, TopCV, TopDev.
-- Xu ly pagination, delay request, retry va ghi log crawl.
-- Thu thap toi thieu 1000 mau du lieu tuyen dung do nhom tu crawl.
-- Hop nhat du lieu ve mot schema thong nhat.
+- Crawl du lieu tu ITViec, TopCV, TopDev
+- Xu ly pagination va luu file raw
+- Hop nhat du lieu tho thanh file tong hop
+- Ghi lai nguon crawl, ngay crawl, so mau moi nguon
 
-### Dau ra can nop
+### File phu trach
 
-- Source code crawler.
-- Thu muc `data/raw/` chua du lieu tho tu crawl.
-- File tong hop nguon crawl, so trang da quet, so mau thu duoc theo tung website.
-- Mo ta cach thu thap du lieu de dua vao notebook/slide.
+- `src/data_collection/itviec_crawler.py`
+- `src/data_collection/topcv_crawler.py`
+- `src/data_collection/topdev_crawler.py`
+- `src/data_collection/merge_raw_data.py`
+- `raw data/itviec_jobs.json`
+- `raw data/topcv_jobs.json`
+- `raw data/topdev_jobs.json`
+- `raw data/jobs_merged_raw.csv`
 
-### Tieu chi hoan thanh
+### Noi dung phai noi khi thuyet trinh
 
-- Du lieu la do nhom tu crawl, khong su dung dataset tai san.
-- Moi ban ghi co it nhat 5 bien quan trong.
-- Co dan nguon va URL crawl ro rang.
+- Crawl tu website nao
+- Lay cac truong gi
+- So mau thu duoc bao nhieu
+- Cach dam bao du lieu do nhom tu thu thap
+
+### Phan phai viet trong notebook tong
+
+- `3. Thu thap du lieu`
+- Mo ta nguon crawl, ngay crawl, cach crawl
+- Bang tong hop so mau theo tung nguon
+- Mo ta schema du lieu raw
 
 ## Thanh vien 2 - Data Processor va NLP Specialist
 
-### Nhiem vu chinh
+### Cong viec phai lam
 
-- Kiem tra schema va hop nhat ten cot.
-- Xu ly gia tri thieu, trung lap, format luong, format dia diem, level, kinh nghiem.
-- Chuan hoa salary ve cung don vi de tao `salary_avg`.
-- Trich xuat ky nang tu tieu de va mo ta cong viec.
-- Ma hoa du lieu danh muc va tao bien dac trung.
+- Lam sach du lieu va bo trung lap
+- Chuan hoa cot salary
+- Tao `salary_avg`
+- Chuan hoa `location`, `level`, `experience_years`
+- Trich xuat ky nang tu text
+- Ma hoa category va tao feature moi
 
-### Dau ra can nop
+### File phu trach
 
-- File `data/interim/` sau hop nhat.
-- File `data/processed/` sau cleaning va feature engineering.
-- Mo ta ro quy trinh cleaning truoc/sau.
-- Cac cot dac trung moi nhu `experience_years`, `salary_avg`, `skills_extracted`, cac cot dummy skill.
+- `src/processing/clean_jobs.py`
+- `src/processing/extract_skills.py`
+- `clean data/jobs_cleaned.csv`
+- `clean data/jobs_features.csv`
 
-### Tieu chi hoan thanh
+### Noi dung phai noi khi thuyet trinh
 
-- Co mo ta cach xu ly du lieu nhieu, null, trung lap va salary khong ro rang.
-- Co minh hoa phan bo du lieu truoc va sau cleaning.
-- Co ma hoa hoac vector hoa cho bien category/text.
+- Du lieu loi duoc xu ly the nao
+- Salary duoc chuyen doi ra sao
+- Encoding/NLP duoc lam bang cach nao
+- Cac feature moi nao quan trong cho bai toan
+
+### Phan phai viet trong notebook tong
+
+- `6. Lam sach va chuan hoa du lieu`
+- `7. Ma hoa du lieu va xu ly ngon ngu tu nhien`
+- `8. Feature engineering`
+- Phan minh hoa truoc va sau cleaning
 
 ## Thanh vien 3 - Data Analyst va Visualizer
 
-### Nhiem vu chinh
+### Cong viec phai lam
 
-- Thuc hien EDA don bien va da bien.
-- Tao cac bieu do phan bo luong, top ky nang, salary theo level, location, company type.
-- Ve correlation map, scatter plot, box plot, distribution plot, clustermap.
-- Truc quan hoa du lieu nhieu chieu bang t-SNE neu du lieu da duoc vector hoa.
-- Viet nhan xet va ket luan ve tinh kha thi cua bai toan.
+- Tao thong ke mo ta cho du lieu
+- Ve bieu do don bien va da bien
+- Ve heatmap, boxplot, scatter plot, clustermap
+- Thu nghiem t-SNE neu co du lieu da ma hoa
+- Viet ket luan va danh gia tinh kha thi cua bai toan
 
-### Dau ra can nop
+### File phu trach
 
-- Cac bieu do dua vao notebook/slide.
-- Cac nhan xet sau moi phan tich.
-- Phan ket luan tong hop.
-- Phan tai lieu tham khao o cuoi notebook/slide.
+- `notebooks/01_data_collection_and_cleaning.ipynb`
+- `notebooks/02_eda_and_visualization.ipynb`
+- `notebooks/03_midterm_submission_final.ipynb`
+- `reports/eda_salary_distribution.png`
+- `reports/correlation_heatmap.png`
+- `reports/skills_clustermap.png`
+- `reports/tsne_visualization.png`
 
-### Tieu chi hoan thanh
+### Noi dung phai noi khi thuyet trinh
 
-- Moi bieu do phai tra loi mot cau hoi cu the.
-- Phan ket luan phai noi ro bai toan co kha thi hay khong.
-- Chi ra nhom dac trung co gia tri de xay dung mo hinh trong bai tap sau.
+- Bieu do nao tra loi cau hoi nao
+- Bien nao co anh huong den salary
+- Du lieu co bieu hien xu huong/cum hay khong
+- Bai toan co kha thi de model hoa hay khong
 
-## Cach ghep phan nop thanh mot notebook thong nhat
+### Phan phai viet trong notebook tong
 
-1. Thanh vien 1 cung cap thong tin nguon du lieu va quy trinh crawl.
-2. Thanh vien 2 chen quy trinh cleaning, encoding, feature engineering.
-3. Thanh vien 3 chen EDA, da bien, t-SNE, ket luan.
-4. Ca nhom ra soat de dam bao notebook co day du cac muc bat buoc va ngon ngu thong nhat.
+- `4. Mo ta du lieu ban dau`
+- `5. Thong ke mo ta va truc quan hoa don bien`
+- `9. Truc quan hoa moi quan he da bien`
+- `10. Truc quan hoa khong gian du lieu nhieu chieu`
+- `11. Danh gia tinh kha thi cua bai toan`
+- `12. Ket luan`
+- `13. Tai lieu tham khao`
 
-## Checklist truoc khi nop
+## Cach ghep bai nop
 
-- Co phat bieu bai toan o dau notebook.
-- Co noi ro `Y = salary_avg` va day la bai toan hoi quy.
-- Co lap luan tinh kha thi ve du lieu.
-- Co mo ta nguon du lieu va cach nhom tu crawl.
-- So mau lon hon 1000.
-- So bien lon hon hoac bang 5.
-- Co thong ke mo ta don bien.
-- Co cleaning va minh hoa truoc/sau cleaning.
-- Co encoding hoac vector hoa text.
-- Co feature engineering.
-- Co truc quan hoa da bien hoac t-SNE/clustering observation.
-- Co ket luan.
-- Co tai lieu tham khao o cuoi notebook.
+1. Thanh vien 1 nop du lieu tho va mo ta nguon du lieu.
+2. Thanh vien 2 nop du lieu sau cleaning va mo ta tien xu ly.
+3. Thanh vien 3 tong hop notebook cuoi cung, nhan xet va ket luan.
+4. Ca nhom cung doc lai `README.md` va checklist truoc khi nop.
+
+## Phan notebook tong nen chia theo nguoi
+
+- Thanh vien 1 viet phan mo ta bai toan lien quan den du lieu crawl va toan bo muc thu thap du lieu.
+- Thanh vien 2 viet phan cleaning, encoding, NLP va feature engineering.
+- Thanh vien 3 viet phan EDA, truc quan hoa da bien, t-SNE, ket luan va tai lieu tham khao.
+- Ca nhom cung ra soat phan `1. Phat bieu bai toan`, vi day la phan mo dau quan trong nhat cua notebook.
+
+## Checklist nhanh cho tung nguoi
+
+### Thanh vien 1
+
+- Co raw data
+- Co so mau > 1000
+- Co mo ta cach crawl
+
+### Thanh vien 2
+
+- Co clean data
+- Co cleaning truoc/sau
+- Co encoding hoac NLP
+
+### Thanh vien 3
+
+- Co bieu do mo ta
+- Co nhan xet
+- Co ket luan va tai lieu tham khao
