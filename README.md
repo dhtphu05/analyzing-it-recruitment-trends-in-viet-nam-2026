@@ -77,6 +77,43 @@ STTnhom - Phan tich va du bao xu huong tuyen dung IT tai Viet Nam/
     `-- tsne_visualization.png
 ```
 
+## 4.1. Link nhanh den cac file quan trong
+
+### Tai lieu chinh
+
+- [Problem Statement](docs/problem_statement.md)
+- [Phan cong vai tro](docs/team_roles.md)
+- [Requirements](requirements.txt)
+
+### Notebook
+
+- [Notebook base](notebooks/01_it_recruitment_vn_project_base.ipynb)
+- [Notebook template nop giua ky](notebooks/02_midterm_submission_template.ipynb)
+- `notebooks/01_data_collection_and_cleaning.ipynb`
+- `notebooks/02_eda_and_visualization.ipynb`
+- `notebooks/03_midterm_submission_final.ipynb`
+
+### Source code
+
+- [Crawler ITViec](src/data_collection/itviec_crawler.py)
+- [Crawler TopCV](src/data_collection/topcv_crawler.py)
+- [Crawler TopDev](src/data_collection/topdev_crawler.py)
+- [Merge raw data](src/data_collection/merge_raw_data.py)
+- [Clean jobs](src/processing/clean_jobs.py)
+- [Extract skills](src/processing/extract_skills.py)
+- [EDA helper](src/analysis/eda.py)
+- [Visualization helper](src/analysis/visualize.py)
+- [Model baseline](src/models/train_salary_regressor.py)
+
+### Thu muc du lieu va ket qua
+
+- `raw data/`
+- `clean data/`
+- [data/raw](data/raw)
+- [data/interim](data/interim)
+- [data/processed](data/processed)
+- [reports](reports)
+
 ## 5. Trinh tu thuc hien
 
 1. Crawl du lieu tu ITViec, TopCV, TopDev va luu vao `raw data/`.
