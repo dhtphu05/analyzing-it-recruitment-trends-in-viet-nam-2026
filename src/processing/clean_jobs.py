@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import logging
 import re
 import sys
-import unicodedata
 from pathlib import Path
 
 import numpy as np
@@ -14,30 +14,89 @@ if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from src.config import EXPECTED_COLUMNS
+from src.processing.utils import normalize_text, slugify_key, strip_accents
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+# Constants
 SALARY_EXCHANGE_RATES = {
     "VND": 1.0,
     "USD": 25_000.0,
 }
 
+# (#1) Thêm TopDev default currency
 DEFAULT_CURRENCY_BY_SOURCE = {
     "itviec": "USD",
     "topcv": "VND",
+    "topdev": "VND",
 }
 
+# (#9) Bổ sung thêm nhiều tỉnh thành phổ biến
 LOCATION_MAP = {
+    # Ha Noi
     "ha noi": "Ha Noi",
     "hanoi": "Ha Noi",
     "hn": "Ha Noi",
     "ha noi city": "Ha Noi",
     "tp ha noi": "Ha Noi",
+    "thanh pho ha noi": "Ha Noi",
+    # Ho Chi Minh
     "hcm": "Ho Chi Minh",
     "hcmc": "Ho Chi Minh",
     "ho chi minh": "Ho Chi Minh",
     "ho chi minh city": "Ho Chi Minh",
     "tp hcm": "Ho Chi Minh",
     "tp. hcm": "Ho Chi Minh",
+    "tp ho chi minh": "Ho Chi Minh",
+    "thanh pho ho chi minh": "Ho Chi Minh",
+    "sai gon": "Ho Chi Minh",
+    "saigon": "Ho Chi Minh",
+    # Da Nang
     "da nang": "Da Nang",
     "danang": "Da Nang",
+    "tp da nang": "Da Nang",
+    "thanh pho da nang": "Da Nang",
+    # Hai Phong
+    "hai phong": "Hai Phong",
+    "haiphong": "Hai Phong",
+    "tp hai phong": "Hai Phong",
+    # Binh Duong
+    "binh duong": "Binh Duong",
+    "tp binh duong": "Binh Duong",
+    "thu dau mot": "Binh Duong",
+    # Dong Nai
+    "dong nai": "Dong Nai",
+    "bien hoa": "Dong Nai",
+    # Can Tho
+    "can tho": "Can Tho",
+    "tp can tho": "Can Tho",
+    # Hue
+    "hue": "Hue",
+    "thua thien hue": "Hue",
+    # Bac Ninh
+    "bac ninh": "Bac Ninh",
+    # Khanh Hoa / Nha Trang
+    "nha trang": "Khanh Hoa",
+    "khanh hoa": "Khanh Hoa",
+    # Quang Ninh
+    "quang ninh": "Quang Ninh",
+    "ha long": "Quang Ninh",
+    # Other provinces
+    "vinh phuc": "Vinh Phuc",
+    "hung yen": "Hung Yen",
+    "ha nam": "Ha Nam",
+    "thai nguyen": "Thai Nguyen",
+    "lam dong": "Lam Dong",
+    "da lat": "Lam Dong",
+    "vung tau": "Ba Ria Vung Tau",
+    "ba ria vung tau": "Ba Ria Vung Tau",
+    "long an": "Long An",
+    "tay ninh": "Tay Ninh",
 }
 
 REMOTE_MAP = {
@@ -50,26 +109,64 @@ REMOTE_MAP = {
     "wfh": "remote",
 }
 
+# (#6) Danh sách công ty IT lớn tại VN để phân loại company_type chính xác hơn
+KNOWN_TECH_COMPANIES = {
+    "fpt",
+    "vng",
+    "tiki",
+    "shopee",
+    "momo",
+    "vnpay",
+    "viettel",
+    "cmcglobal",
+    "cmc global",
+    "cmc",
+    "kms technology",
+    "kms",
+    "nashtech",
+    "nfq",
+    "axon",
+    "fossil",
+    "tpbank",
+    "zalopay",
+    "zalo",
+    "being",
+    "saigon technology",
+    "co well asia",
+    "rikkeisoft",
+    "ntt data",
+    "grab",
+    "lazada",
+    "bosch",
+    "samsung",
+    "lg",
+    "fujitsu",
+    "nec",
+    "line",
+    "tencent",
+    "money forward",
+    "sun asterisk",
+    "vti",
+    "nal",
+    "sendo",
+    "onemount",
+    "one mount",
+    "vnlife",
+    "ekoios",
+    "devoteam",
+    "logigear",
+    "orient software",
+    "techcombank",
+    "mbbank",
+    "mb bank",
+    "vpbank",
+    "vpn bank",
+}
 
-def strip_accents(text: str) -> str:
-    normalized = unicodedata.normalize("NFKD", text)
-    return "".join(char for char in normalized if not unicodedata.combining(char))
 
-
-def normalize_text(value: object) -> object:
-    if pd.isna(value):
-        return np.nan
-    text = str(value).strip()
-    text = re.sub(r"\s+", " ", text)
-    return text or np.nan
-
-
-def slugify_key(value: object) -> str:
-    if pd.isna(value):
-        return ""
-    text = strip_accents(str(value).lower())
-    text = re.sub(r"[^a-z0-9]+", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+# ---------------------------------------------------------------------------
+# Normalization helpers (dùng utils chung — #10)
+# ---------------------------------------------------------------------------
 
 
 def normalize_location(value: object) -> object:
@@ -78,13 +175,19 @@ def normalize_location(value: object) -> object:
         return np.nan
 
     normalized_parts: list[str] = []
-    for raw_part in re.split(r"[,&/]+", str(text)):
-        key = slugify_key(raw_part)
+    for raw_part in re.split(r"[,&/|]+|\s+-\s+", str(text)):
+        sanitized_part = re.sub(r"\([^)]*\)", " ", str(raw_part))
+        key = slugify_key(sanitized_part)
+        key = re.sub(r"\b(moi|new)\b", " ", key)
+        key = re.sub(r"\b(thanh pho|tp)\b", " ", key)
+        key = re.sub(r"\s+", " ", key).strip()
         if not key:
             continue
         cleaned = LOCATION_MAP.get(key)
+        if cleaned is None and (key == "noi khac" or re.fullmatch(r"\d+\s+noi\s+khac", key)):
+            cleaned = "Others"
         if cleaned is None:
-            cleaned = raw_part.strip().title()
+            cleaned = " ".join(token.capitalize() for token in key.split())
         if cleaned not in normalized_parts:
             normalized_parts.append(cleaned)
 
@@ -101,6 +204,7 @@ def normalize_remote_option(value: object) -> object:
     return REMOTE_MAP.get(key, text.lower())
 
 
+# (#7) Đổi sang trung bình thay vì max
 def parse_experience_years(value: object) -> float | object:
     text = normalize_text(value)
     if pd.isna(text):
@@ -111,7 +215,9 @@ def parse_experience_years(value: object) -> float | object:
         return np.nan
 
     numbers_float = [float(number) for number in numbers]
-    return max(numbers_float)
+    if len(numbers_float) >= 2:
+        return round((min(numbers_float) + max(numbers_float)) / 2, 1)
+    return numbers_float[0]
 
 
 def normalize_currency(value: object, source: str, salary_min: object, salary_max: object) -> object:
@@ -164,6 +270,8 @@ def compute_salary_fields(df: pd.DataFrame) -> pd.DataFrame:
         & (enriched["salary_min"] > enriched["salary_max"])
     )
     if swap_mask.any():
+        n_swapped = int(swap_mask.sum())
+        log.info("Swapped salary_min/salary_max for %d rows", n_swapped)
         min_values = enriched.loc[swap_mask, "salary_min"].copy()
         enriched.loc[swap_mask, "salary_min"] = enriched.loc[swap_mask, "salary_max"]
         enriched.loc[swap_mask, "salary_max"] = min_values
@@ -175,6 +283,9 @@ def compute_salary_fields(df: pd.DataFrame) -> pd.DataFrame:
     enriched.loc[only_min_mask, "salary_max"] = enriched.loc[only_min_mask, "salary_min"]
     enriched.loc[only_max_mask, "salary_min"] = enriched.loc[only_max_mask, "salary_max"]
     enriched.loc[only_min_mask | only_max_mask, "salary_is_estimated"] = 1
+    n_estimated = int((only_min_mask | only_max_mask).sum())
+    if n_estimated:
+        log.info("Estimated missing salary bound for %d rows", n_estimated)
 
     enriched["salary_avg"] = enriched[["salary_min", "salary_max"]].mean(axis=1)
 
@@ -182,15 +293,42 @@ def compute_salary_fields(df: pd.DataFrame) -> pd.DataFrame:
         enriched["salary_avg"].notna()
         & ((enriched["salary_avg"] < 1_000_000) | (enriched["salary_avg"] > 500_000_000))
     )
+    n_invalid = int(invalid_salary_mask.sum())
+    if n_invalid:
+        log.warning("Removed %d rows with salary_avg outside [1M, 500M] VND range", n_invalid)
     enriched.loc[invalid_salary_mask, ["salary_min", "salary_max", "salary_avg"]] = np.nan
     enriched.loc[invalid_salary_mask, "salary_is_estimated"] = 0
 
     return enriched
 
 
-def normalize_level(job_title: object, experience_years: object) -> object:
+# (#5) Ưu tiên dùng level gốc, chỉ suy luận khi level gốc là NaN
+def normalize_level(raw_level: object, job_title: object, experience_years: object) -> object:
+    # Ưu tiên level gốc nếu đã có sẵn
+    if pd.notna(raw_level):
+        key = slugify_key(raw_level)
+        level_keywords_map = {
+            "intern": "Intern",
+            "thuc tap": "Intern",
+            "fresher": "Junior",
+            "junior": "Junior",
+            "entry level": "Junior",
+            "middle": "Middle",
+            "mid": "Middle",
+            "senior": "Senior",
+            "lead": "Lead",
+            "principal": "Lead",
+            "manager": "Manager",
+            "head": "Manager",
+            "architect": "Senior",
+            "director": "Manager",
+        }
+        for keyword, level in level_keywords_map.items():
+            if keyword in key:
+                return level
+
+    # Fallback: suy luận từ job_title
     title_text = slugify_key(job_title)
-    years = float(experience_years) if pd.notna(experience_years) else np.nan
 
     if any(keyword in title_text for keyword in ["intern", "thuc tap"]):
         return "Intern"
@@ -203,6 +341,8 @@ def normalize_level(job_title: object, experience_years: object) -> object:
             return "Manager"
         return "Senior"
 
+    # Fallback: suy luận từ experience_years
+    years = float(experience_years) if pd.notna(experience_years) else np.nan
     if pd.notna(years):
         if years < 1:
             return "Intern"
@@ -217,24 +357,36 @@ def normalize_level(job_title: object, experience_years: object) -> object:
     return np.nan
 
 
+# (#6) Cải thiện phân loại company_type
 def normalize_company_type(company_name: object) -> object:
     text = normalize_text(company_name)
     if pd.isna(text):
         return np.nan
 
     key = slugify_key(text)
+
+    # Ưu tiên check danh sách công ty IT lớn đã biết
+    for known in KNOWN_TECH_COMPANIES:
+        if known in key:
+            return "Technology"
+
     if any(keyword in key for keyword in ["ngan hang", "bank", "chung khoan", "bao hiem", "finance", "fintech"]):
         return "Finance"
     if any(keyword in key for keyword in ["giao duc", "education", "university", "academy", "school"]):
         return "Education"
     if any(keyword in key for keyword in ["health", "benh vien", "medical", "pharma"]):
         return "Healthcare"
-    if any(keyword in key for keyword in ["solution", "software", "technology", "tech", "system", "digital"]):
+    if any(keyword in key for keyword in ["solution", "software", "technology", "tech", "system", "digital",
+                                           "it", "data", "cloud", "cyber", "ai"]):
         return "Technology"
-    if any(keyword in key for keyword in ["logistics", "shipping", "delivery", "giao hang"]):
+    if any(keyword in key for keyword in ["logistics", "shipping", "delivery", "giao hang", "van tai"]):
         return "Logistics"
     if any(keyword in key for keyword in ["real estate", "bat dong san", "property"]):
         return "Real Estate"
+    if any(keyword in key for keyword in ["game", "gaming", "entertainment", "giai tri"]):
+        return "Entertainment"
+    if any(keyword in key for keyword in ["ecommerce", "e commerce", "thuong mai dien tu", "san thuong mai"]):
+        return "E-Commerce"
     return "Other"
 
 
@@ -255,19 +407,23 @@ def load_raw_files(input_paths: list[Path]) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
 
     for path in input_paths:
-        source = "itviec" if "itviec" in path.stem.lower() else "topcv" if "topcv" in path.stem.lower() else path.stem.lower()
+        source = "itviec" if "itviec" in path.stem.lower() else "topcv" if "topcv" in path.stem.lower() else "topdev" if "topdev" in path.stem.lower() else path.stem.lower()
         frame = pd.read_csv(path)
         frame["source"] = source
+        log.info("Loaded %-30s  rows=%d  source=%s", path.name, len(frame), source)
         frames.append(frame)
 
     if not frames:
         raise ValueError("No input CSV files found to clean.")
 
-    return pd.concat(frames, ignore_index=True)
+    merged = pd.concat(frames, ignore_index=True)
+    log.info("Total rows after merge: %d", len(merged))
+    return merged
 
 
 def clean_jobs(df: pd.DataFrame) -> pd.DataFrame:
     cleaned = df.copy()
+    n_original = len(cleaned)
 
     for column in ["job_title", "company_name", "location", "remote_option", "tech_stack"]:
         if column in cleaned.columns:
@@ -279,15 +435,26 @@ def clean_jobs(df: pd.DataFrame) -> pd.DataFrame:
 
     cleaned = compute_salary_fields(cleaned)
 
+    # (#5) Truyền thêm raw level nếu có
+    raw_level_series = cleaned["level"] if "level" in cleaned.columns else pd.Series(np.nan, index=cleaned.index)
     cleaned["level"] = cleaned.apply(
-        lambda row: normalize_level(row.get("job_title"), row.get("experience_years")),
+        lambda row: normalize_level(
+            raw_level_series[row.name],
+            row.get("job_title"),
+            row.get("experience_years"),
+        ),
         axis=1,
     )
     cleaned["company_type"] = cleaned["company_name"].apply(normalize_company_type)
 
     cleaned["job_id"] = cleaned.apply(build_job_id, axis=1)
 
+    n_before_dedup = len(cleaned)
     cleaned = cleaned.drop_duplicates(subset=["job_id"]).reset_index(drop=True)
+    n_dropped = n_before_dedup - len(cleaned)
+    if n_dropped:
+        log.info("Dropped %d duplicate rows (by job_id)", n_dropped)
+
     ordered_columns = EXPECTED_COLUMNS + [
         "remote_option",
         "tech_stack",
@@ -298,6 +465,7 @@ def clean_jobs(df: pd.DataFrame) -> pd.DataFrame:
     remaining_columns = [column for column in cleaned.columns if column not in ordered_columns]
     cleaned = cleaned[[column for column in ordered_columns if column in cleaned.columns] + remaining_columns]
 
+    log.info("Cleaning done: %d → %d rows", n_original, len(cleaned))
     return cleaned
 
 
@@ -326,12 +494,13 @@ def main() -> None:
     cleaned = clean_jobs(merged)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    cleaned.to_csv(args.output, index=False, na_rep="NaN")
+    # (#11) Dùng na_rep="" thay vì "NaN" để tránh nhầm lẫn string/NaN
+    cleaned.to_csv(args.output, index=False, na_rep="")
 
     n_salary_known = int(cleaned["salary_avg"].notna().sum())
-    print(f"Saved cleaned dataset with {len(cleaned)} rows to {args.output}")
-    print(f"Rows with usable salary_avg: {n_salary_known}")
-    print(f"Rows with missing salary_avg: {len(cleaned) - n_salary_known}")
+    log.info("Saved cleaned dataset with %d rows to %s", len(cleaned), args.output)
+    log.info("Rows with usable salary_avg: %d", n_salary_known)
+    log.info("Rows with missing salary_avg: %d", len(cleaned) - n_salary_known)
 
 
 if __name__ == "__main__":

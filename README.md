@@ -117,8 +117,8 @@ STTnhom - Phan tich va du bao xu huong tuyen dung IT tai Viet Nam/
 ## 5. Trinh tu thuc hien
 
 1. Crawl du lieu tu ITViec, TopCV, TopDev va luu vao `raw data/`.
-2. Hop nhat du lieu tho thanh mot bang tong hop.
-3. Lam sach du lieu, bo trung lap, xu ly null, chuan hoa salary va luu vao `clean data/`.
+2. Dat cac file CSV raw vao `data/raw/`.
+3. Chay cleaning de hop nhat cac file raw, bo trung lap, xu ly null, chuan hoa salary va luu vao `data/clean-data/`.
 4. Trich xuat ky nang, tao them feature va ma hoa category/text.
 5. Truc quan hoa du lieu don bien va da bien tren notebook.
 6. Viet nhan xet, ket luan va tai lieu tham khao bang Markdown trong notebook.
@@ -139,9 +139,8 @@ Chay cac buoc xu ly co ban:
 python3 src/data_collection/itviec_crawler.py --pages 10 --output "raw data/itviec_jobs.json"
 python3 src/data_collection/topcv_crawler.py --pages 10 --output "raw data/topcv_jobs.json"
 python3 src/data_collection/topdev_crawler.py --pages 10 --output "raw data/topdev_jobs.json"
-python3 src/data_collection/merge_raw_data.py --input-dir "raw data" --output "raw data/jobs_merged_raw.csv"
-python3 src/processing/clean_jobs.py --input "raw data/jobs_merged_raw.csv" --output "clean data/jobs_cleaned.csv"
-python3 src/processing/extract_skills.py --input "clean data/jobs_cleaned.csv" --output "clean data/jobs_features.csv"
+python3 src/processing/clean_jobs.py --input-dir "data/raw" --output "data/clean-data/jobs_cleaned.csv"
+python3 src/processing/extract_skills.py --input "data/clean-data/jobs_cleaned.csv" --output "data/clean-data/jobs_features.csv"
 ```
 
 Sau khi co du lieu, mo notebook de trinh bay:

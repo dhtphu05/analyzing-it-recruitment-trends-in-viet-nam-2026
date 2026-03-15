@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import re
 import sys
-import unicodedata
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +11,14 @@ import pandas as pd
 if __package__ is None or __package__ == "":
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
+from src.processing.utils import strip_accents
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
 
 SKILL_ALIAS_MAP = {
     "c sharp": "c#",
@@ -128,11 +136,6 @@ SEPARATOR_PATTERN = re.compile(r"[,;/|]+")
 TOKEN_CLEAN_PATTERN = re.compile(r"[^a-z0-9+#./\-\s]")
 
 
-def strip_accents(text: str) -> str:
-    normalized = unicodedata.normalize("NFKD", text)
-    return "".join(char for char in normalized if not unicodedata.combining(char))
-
-
 def normalize_token(token: str) -> str:
     token = strip_accents(token.lower())
     token = token.replace("&", " ")
@@ -158,11 +161,13 @@ def split_skill_candidates(text: str) -> list[str]:
 
 
 def extract_skills_from_row(row: pd.Series) -> list[str]:
-    values = [row.get("tech_stack", ""), row.get("job_title", ""), row.get("job_description", "")]
-    candidates: list[str] = []
+    source_columns = ["tech_stack", "job_title"]
+    if "job_description" in row.index:
+        source_columns.append("job_description")
 
-    for value in values:
-        candidates.extend(split_skill_candidates(value))
+    candidates: list[str] = []
+    for col in source_columns:
+        candidates.extend(split_skill_candidates(row.get(col, "")))
 
     deduped: list[str] = []
     seen: set[str] = set()
@@ -182,8 +187,14 @@ def enrich_with_skill_features(df: pd.DataFrame) -> pd.DataFrame:
     enriched["skills_extracted"] = skill_lists.apply(lambda items: ", ".join(items))
     enriched["skills_count"] = skill_lists.apply(len)
 
+    # (#3) Sửa bug late-binding closure — dùng default argument
     for column_name, matched_skills in SKILL_INDICATORS.items():
-        enriched[column_name] = skill_lists.apply(lambda items: int(bool(set(items) & matched_skills)))
+        enriched[column_name] = skill_lists.apply(
+            lambda items, ms=matched_skills: int(bool(set(items) & ms))
+        )
+
+    log.info("Extracted skills for %d rows, avg skills per row: %.1f",
+             len(enriched), enriched["skills_count"].mean())
 
     return enriched
 
@@ -195,11 +206,14 @@ def main() -> None:
     args = parser.parse_args()
 
     df = pd.read_csv(args.input)
+    log.info("Loaded %d rows from %s", len(df), args.input)
+
     enriched = enrich_with_skill_features(df)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    enriched.to_csv(args.output, index=False, na_rep="NaN")
-    print(f"Saved skill-enriched dataset with {len(enriched)} rows to {args.output}")
+    # (#11) Dùng na_rep="" thay vì "NaN"
+    enriched.to_csv(args.output, index=False, na_rep="")
+    log.info("Saved skill-enriched dataset with %d rows to %s", len(enriched), args.output)
 
 
 if __name__ == "__main__":
