@@ -6,7 +6,8 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-BASE_URL = "https://www.topcv.vn/tim-viec-lam-software-engineering-cr257cb258?page="
+# BASE_URL = "https://www.topcv.vn/tim-viec-lam-software-engineering-cr257cb258?page="
+BASE_URL = "https://www.topcv.vn/tim-viec-lam-cong-nghe-thong-tin-cr257?page="
 
 headers = {
     "User-Agent": "Mozilla/5.0"
@@ -176,7 +177,7 @@ def save_csv(data):
 
 if __name__ == "__main__":
 
-    jobs = crawl_topcv(20)
+    jobs = crawl_topcv(40)
 
     save_csv(jobs)
 
