@@ -21,8 +21,5 @@ EXPECTED_COLUMNS = [
     "salary_max",
     "salary_avg",
     "salary_currency",
-    "job_description",
     "skills_extracted",
-    "posted_date",
-    "job_url",
 ]
