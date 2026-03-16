@@ -21,5 +21,4 @@ EXPECTED_COLUMNS = [
     "salary_max",
     "salary_avg",
     "salary_currency",
-    "skills_extracted",
 ]
