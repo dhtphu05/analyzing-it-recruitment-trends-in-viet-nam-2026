@@ -6,8 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-# BASE_URL = "https://www.topcv.vn/tim-viec-lam-software-engineering-cr257cb258?page="
-BASE_URL = "https://www.topcv.vn/tim-viec-lam-cong-nghe-thong-tin-cr257?page="
+BASE_URL = "https://www.topcv.vn/tim-viec-lam-software-engineering-cr257cb258?page="
 
 headers = {
     "User-Agent": "Mozilla/5.0"
@@ -78,7 +77,7 @@ def crawl_topcv(pages=10):
 
             try:
 
-                # ===== job title (fix Lì xì)
+                #job title
                 title_tag = job.select_one("h3.title a span")
 
                 if not title_tag:
@@ -86,27 +85,27 @@ def crawl_topcv(pages=10):
 
                 job_title = title_tag.text.strip()
 
-                # ===== company
+                #company
                 company_tag = job.select_one(".company-name")
                 company_name = company_tag.text.strip() if company_tag else ""
 
-                # ===== salary
+                #salary
                 salary_tag = job.select_one(".title-salary")
                 salary_text = salary_tag.text.strip() if salary_tag else ""
 
                 salary_min, salary_max, currency = clean_salary(salary_text)
 
-                # ===== location
+                #location
                 location_tag = job.select_one(".city-text")
                 location = location_tag.text.strip() if location_tag else ""
 
-                # ===== experience
+                #experience
                 exp_tag = job.select_one(".exp span")
                 exp_text = exp_tag.text.strip() if exp_tag else ""
 
                 experience_years = parse_experience(exp_text)
 
-                # ===== skills
+                #skills
                 skill_tags = job.select(".item-tag")
 
                 skills = []

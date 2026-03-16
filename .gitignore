@@ -20,12 +20,10 @@ env/
 .idea/
 
 # Local data artifacts
-data/raw/*.csv
-data/raw/*.json
-data/interim/*.csv
-data/interim/*.json
-data/processed/*.csv
-data/processed/*.json
+# data/raw/*.csv
+# data/raw/*.json
+# data/processed/*.csv
+# data/processed/*.json
 
 # Reports / generated outputs
 reports/*.png
