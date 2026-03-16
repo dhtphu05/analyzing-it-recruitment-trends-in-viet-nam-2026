@@ -20,7 +20,7 @@ def normalize_text(value: object) -> object:
     """Normalize whitespace and return NaN for empty/null values."""
     if pd.isna(value):
         return np.nan
-    text = str(value).strip()
+    text = unicodedata.normalize("NFC", str(value)).strip()
     text = re.sub(r"\s+", " ", text)
     return text or np.nan
 
