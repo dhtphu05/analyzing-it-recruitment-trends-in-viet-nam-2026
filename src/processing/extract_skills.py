@@ -43,10 +43,13 @@ SKILL_ALIAS_MAP = {
     "node js": "node.js",
     "node": "node.js",
     "reactjs": "react",
+    "react.js": "react",
     "react js": "react",
     "vuejs": "vue",
+    "vue.js": "vue",
     "vue js": "vue",
     "nextjs": "next.js",
+    "next.js": "next.js",
     "next js": "next.js",
     "nestjs": "nestjs",
     "nest js": "nestjs",
@@ -54,8 +57,10 @@ SKILL_ALIAS_MAP = {
     "express js": "express",
     "javascript": "js",
     "typescript": "ts",
+    "html css": "html/css",
     "postgres": "postgresql",
     "postgre": "postgresql",
+    "postgres sql": "postgresql",
     "golang": "go",
     "ci cd": "ci/cd",
     "ci/cd": "ci/cd",
@@ -63,6 +68,10 @@ SKILL_ALIAS_MAP = {
     "quality assurance": "qa",
     "business intelligence": "bi",
     "power bi": "powerbi",
+    "githubactions": "github actions",
+    "github action": "github actions",
+    "gitlab ci": "gitlab",
+    "restful api": "rest api",
     "micro services": "microservices",
     "micro-service": "microservices",
     "micro service": "microservices",
@@ -86,6 +95,9 @@ SKILL_VOCABULARY = {
     "django",
     "flask",
     "fastapi",
+    "selenium",
+    "playwright",
+    "cypress",
     "laravel",
     "ruby",
     "rails",
@@ -96,6 +108,7 @@ SKILL_VOCABULARY = {
     "react native",
     "vue",
     "angular",
+    "html/css",
     "node.js",
     "express",
     "nestjs",
@@ -118,6 +131,8 @@ SKILL_VOCABULARY = {
     "jenkins",
     "gitlab",
     "github actions",
+    "bitbucket",
+    "circleci",
     "linux",
     "git",
     "jira",
@@ -157,6 +172,7 @@ SKILL_VOCABULARY = {
     "rest api",
     "graphql",
     "firebase",
+    "graphql",
     "flutter",
     "android",
     "ios",
@@ -206,7 +222,12 @@ SKILL_INDICATORS = {
     "has_devops": {"docker", "kubernetes", "linux", "devops", "devsecops", "ci/cd", "jenkins", "gitlab", "github actions"},
     "has_mobile": {"flutter", "android", "ios", "swift", "kotlin"},
     "has_testing": {"qa", "tester", "automation test", "manual test"},
+    "has_backend": {"java", "python", "php", "go", "c#", ".net", "spring", "django", "flask", "fastapi", "node.js", "nestjs", "express", "graphql", "rest api"},
+    "has_frontend": {"js", "ts", "react", "vue", "angular", "next.js", "html/css"},
 }
+
+MAIN_LANGUAGE_PRIORITY = ["python", "java", "js", "ts", "c#", "php", "go", "sql", "kotlin", "swift"]
+MAIN_FRAMEWORK_PRIORITY = ["react", "next.js", "vue", "angular", "node.js", "nestjs", "express", "spring boot", "spring", ".net", "fastapi", "django", "flutter"]
 
 SEPARATOR_PATTERN = re.compile(r"[,;/|]+")
 TOKEN_CLEAN_PATTERN = re.compile(r"[^a-z0-9+#./\-\s]")
@@ -284,6 +305,25 @@ def enrich_with_skill_features(df: pd.DataFrame) -> pd.DataFrame:
         enriched[column_name] = skill_lists.apply(
             lambda items, ms=matched_skills: int(bool(set(items) & ms))
         )
+
+    enriched["main_language"] = skill_lists.apply(
+        lambda items: next((skill for skill in MAIN_LANGUAGE_PRIORITY if skill in items), pd.NA)
+    )
+    enriched["main_framework"] = skill_lists.apply(
+        lambda items: next((skill for skill in MAIN_FRAMEWORK_PRIORITY if skill in items), pd.NA)
+    )
+    enriched["skill_domain"] = enriched.apply(
+        lambda row: (
+            "Data/AI" if row["has_ai"] or row["has_data"]
+            else "Cloud/DevOps" if row["has_cloud"] or row["has_devops"]
+            else "Mobile" if row["has_mobile"]
+            else "Testing" if row["has_testing"]
+            else "Frontend" if row["has_frontend"]
+            else "Backend" if row["has_backend"]
+            else "General"
+        ),
+        axis=1,
+    )
 
     log.info("Extracted skills for %d rows, avg skills per row: %.1f",
              len(enriched), enriched["skills_count"].mean())
