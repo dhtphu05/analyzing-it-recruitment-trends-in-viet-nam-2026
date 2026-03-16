@@ -1,0 +1,24 @@
+[
+  {
+    "job_id": "topcv-demo-1",
+    "source": "TopCV",
+    "job_title": "Sample Java Developer",
+    "company_name": "Demo Company",
+    "location": "Ha Noi",
+    "company_type": "Outsource",
+    "level": "Fresher",
+    "experience_years": 0,
+    "salary_min": 12000000,
+    "salary_max": 18000000,
+    "salary_avg": 15000000,
+    "salary_currency": "VND",
+    "job_description": "Java, Spring Boot, SQL",
+    "skills_extracted": [
+      "Java",
+      "Spring Boot",
+      "SQL"
+    ],
+    "posted_date": null,
+    "job_url": "https://www.topcv.vn/"
+  }
+]

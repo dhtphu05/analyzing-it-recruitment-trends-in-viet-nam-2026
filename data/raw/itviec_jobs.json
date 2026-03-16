@@ -1,0 +1,24 @@
+[
+  {
+    "job_id": "itviec-demo-1",
+    "source": "ITViec",
+    "job_title": "Sample Python Developer",
+    "company_name": "Demo Company",
+    "location": "Ho Chi Minh City",
+    "company_type": "Product",
+    "level": "Junior",
+    "experience_years": 1,
+    "salary_min": 15000000,
+    "salary_max": 25000000,
+    "salary_avg": 20000000,
+    "salary_currency": "VND",
+    "job_description": "Python, Django, REST API",
+    "skills_extracted": [
+      "Python",
+      "Django",
+      "REST API"
+    ],
+    "posted_date": null,
+    "job_url": "https://www.itviec.com/"
+  }
+]

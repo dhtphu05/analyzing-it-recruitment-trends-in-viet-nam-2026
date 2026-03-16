@@ -1,0 +1,25 @@
+[
+  {
+    "job_id": "topdev-demo-1",
+    "source": "TopDev",
+    "job_title": "Sample Frontend Developer",
+    "company_name": "Demo Company",
+    "location": "Da Nang",
+    "company_type": "Global",
+    "level": "Senior",
+    "experience_years": 4,
+    "salary_min": 25000000,
+    "salary_max": 40000000,
+    "salary_avg": 32500000,
+    "salary_currency": "VND",
+    "job_description": "ReactJS, TypeScript, HTML, CSS",
+    "skills_extracted": [
+      "ReactJS",
+      "TypeScript",
+      "HTML",
+      "CSS"
+    ],
+    "posted_date": null,
+    "job_url": "https://topdev.vn/"
+  }
+]
