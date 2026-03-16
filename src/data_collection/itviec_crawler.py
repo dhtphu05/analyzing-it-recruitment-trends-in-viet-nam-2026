@@ -2,7 +2,8 @@ import re
 import time
 import csv
 import os
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -127,24 +128,28 @@ def extract_experience(text):
 # Phase 1 — Collect job URLs
 # =============================
 
-def collect_job_urls(driver, pages=3):
+def collect_job_urls(driver, start_page=1, pages=10):
     """
-    Duyệt qua các trang listing, thu thập toàn bộ job URLs.
-    Không cần parse chi tiết, chỉ cần lấy link.
+    Duyệt qua các trang listing từ start_page đến start_page+pages-1, thu thập URLs.
     """
     all_urls = []
 
-    for page in range(1, pages + 1):
+    for page in range(start_page, start_page + pages):
 
         url = BASE_URL + str(page)
         print(f"[Phase 1] Collecting URLs from page {page}...")
 
         driver.get(url)
-        time.sleep(2)
+        # Giả lập người dùng chờ từ 1 đến 2 giây lúc mở search list (Nhanh hơn)
+        time.sleep(random.uniform(1.0, 2.0))
 
-        # Scroll nhanh để trigger lazy-load cards
+        # Cuộn ngẫu nhiên
+        scroll_steps = random.randint(1, 3)
+        for _ in range(scroll_steps):
+            driver.execute_script(f"window.scrollBy(0, {random.randint(300, 700)});")
+            time.sleep(random.uniform(0.2, 0.5))
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(1)
+        time.sleep(random.uniform(0.5, 1.0))
 
         try:
             WebDriverWait(driver, 15).until(
@@ -179,9 +184,18 @@ def crawl_job_detail(driver, job_url):
     Trang detail render đầy đủ (không lazy-load), nên không cần scroll.
     """
     try:
-
         driver.get(job_url)
 
+        # Sleep ngắn hơn khi mở trang JD
+        time.sleep(random.uniform(1.0, 2.0))
+
+        # Cuộn chính xác 4 lần để xuống hết trang
+        scroll_height = driver.execute_script("return document.body.scrollHeight")
+        step = scroll_height / 4
+        for i in range(1, 5):
+            driver.execute_script(f"window.scrollTo(0, {step * i});")
+            time.sleep(random.uniform(0.3, 0.8))
+            
         # Chờ phần header JD xuất hiện
         try:
             WebDriverWait(driver, 15).until(
@@ -203,6 +217,21 @@ def crawl_job_detail(driver, job_url):
         company_tag = soup.select_one(".employer-name")
         company_name = company_tag.text.strip() if company_tag else ""
 
+        # ── company type & industry (từ sidebar employer info)
+        company_type = ""
+        company_industry = ""
+        employer_section = soup.select_one("section.job-show-employer-info")
+        if employer_section:
+            for row in employer_section.select("div.row.gx-0"):
+                cols = row.select("div.col")
+                if len(cols) >= 2:
+                    label = cols[0].get_text(strip=True).lower()
+                    value = cols[1].get_text(strip=True)
+                    if "company type" in label:
+                        company_type = value
+                    elif "company industry" in label:
+                        company_industry = value
+
         # ── salary
         salary_container = soup.select_one("div.salary")
         salary_tag = salary_container.select_one("span.ips-2.fw-500") if salary_container else None
@@ -210,13 +239,21 @@ def crawl_job_detail(driver, job_url):
         salary_min, salary_max, currency = clean_salary(salary_text)
 
         # ── remote/work type — "At office" / "Hybrid" / "Remote"
-        # Lấy từ phần preview-header-item có icon người
         remote_option = "onsite"
+        posted_date = datetime.now().strftime("%Y-%m-%d")
         for item in soup.select(".preview-header-item"):
             span = item.select_one("span.normal-text.text-rich-grey")
-            if span:
-                remote_option = detect_remote(span.text.strip())
-                break
+            if not span:
+                continue
+            span_text = span.text.strip()
+            # ── posted date
+            if "posted" in span_text.lower():
+                days_match = re.search(r"(\d+)\s*day", span_text.lower())
+                if days_match:
+                    posted_date = (datetime.now() - timedelta(days=int(days_match.group(1)))).strftime("%Y-%m-%d")
+                # minutes / hours ago → hôm nay (giữ nguyên posted_date = today)
+            else:
+                remote_option = detect_remote(span_text)
 
         # ── location — địa chỉ cụ thể (hoặc thành phố)
         location = ""
@@ -239,8 +276,6 @@ def crawl_job_detail(driver, job_url):
                     pass
 
         # ── tech_stack (Skills section trên trang JD)
-        # Trang detail có section "Skills:" với các itag-light
-        # Cấu trúc: div.imb-4 > div.w-xl-fixed-100 "Skills:" + div.d-flex > a.itag-light
         tech_stack = ""
         for section in soup.select("div.imb-4.imb-xl-3"):
             label = section.select_one("div.w-xl-fixed-100")
@@ -252,7 +287,6 @@ def crawl_job_detail(driver, job_url):
 
         # Fallback nếu không tìm thấy section Skills:
         if not tech_stack:
-            # Lấy từ data-layer params (job_required_skill)
             apply_btn = soup.select_one("a[data-jobs--data-layer-params-value]")
             if apply_btn:
                 import json
@@ -264,12 +298,19 @@ def crawl_job_detail(driver, job_url):
 
         # ── experience — tìm trong section "Your skills and experience"
         experience_years = None
+        job_description = ""
         for h2 in soup.select("section.job-content h2"):
-            if "experience" in h2.get_text().lower():
+            h2_text = h2.get_text().lower()
+            # experience
+            if "experience" in h2_text:
                 container = h2.find_parent("div")
                 text = container.get_text() if container else h2.get_text()
                 experience_years = extract_experience(text)
-                break
+            # job description
+            if "job description" in h2_text:
+                container = h2.find_parent("div")
+                if container:
+                    job_description = container.get_text(separator=" ", strip=True)
 
         return {
             "job_title": job_title,
@@ -277,10 +318,14 @@ def crawl_job_detail(driver, job_url):
             "experience_years": experience_years,
             "location": location,
             "company_name": company_name,
+            "company_type": company_type,
+            "company_industry": company_industry,
             "remote_option": remote_option,
             "salary_min": salary_min,
             "salary_max": salary_max,
             "currency": currency,
+            "posted_date": posted_date,
+            "job_description": job_description,
         }
 
     except Exception as e:
@@ -289,77 +334,118 @@ def crawl_job_detail(driver, job_url):
 
 
 # =============================
+# Save helpers
+# =============================
+
+FIELDNAMES = [
+    "job_title", "tech_stack", "experience_years", "location", "company_name",
+    "company_type", "company_industry", "remote_option",
+    "salary_min", "salary_max", "currency",
+    "posted_date", "job_description",
+]
+
+
+def _get_output_dir():
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    output_dir = os.path.join(project_root, "data", "raw")
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def append_csv(rows, filepath):
+    """Ghi thêm rows vào filepath. Tạo header nếu file chưa tồn tại."""
+    if not rows:
+        return
+    file_exists = os.path.isfile(filepath)
+    with open(filepath, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerows(rows)
+    print(f"  → Appended {len(rows)} rows → {filepath}")
+
+
+def save_csv(data):
+    """Lưu toàn bộ data vào file mới (dùng khi gọi độc lập)."""
+    if not data:
+        print("No data collected")
+        return
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(_get_output_dir(), f"itviec_jobs_{timestamp}.csv")
+    with open(filepath, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(data)
+    print(f"Saved: {len(data)} jobs → {filepath}")
+
+
+# =============================
 # Main crawler
 # =============================
 
-def crawl_itviec(pages=3):
+def crawl_itviec(total_pages=60, batch_size=10):
 
     driver = create_driver()
     dataset = []
+    seen_urls = set()
+
+    # Tạo 1 filepath cố định cho toàn bộ run
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = os.path.join(_get_output_dir(), f"itviec_jobs_{timestamp}.csv")
+    print(f"[Output] {filepath}\n")
 
     try:
+        for start_page in range(41, total_pages + 1, batch_size):
+            batch_num = (start_page - 1) // batch_size + 1
+            print(f"\n{'='*60}")
+            print(f"[Batch {batch_num}] Pages {start_page} → {start_page + batch_size - 1}")
+            print(f"{'='*60}")
 
-        # ── Phase 1: Thu thập toàn bộ URLs từ listing pages
-        job_urls = collect_job_urls(driver, pages)
-        print(f"\n[Phase 1 done] Total URLs: {len(job_urls)}\n")
+            # Phase 1: thu thập URLs cho batch này
+            batch_urls_raw = collect_job_urls(driver, start_page=start_page, pages=batch_size)
+            batch_urls = [u for u in batch_urls_raw if u not in seen_urls]
+            seen_urls.update(batch_urls)
+            print(f"\n[Phase 1 Batch {batch_num}] {len(batch_urls)} URLs mới → starting Phase 2\n")
 
-        # ── Phase 2: Crawl từng JD detail page
-        for i, job_url in enumerate(job_urls, 1):
+            # Phase 2: crawl từng JD trong batch
+            batch_results = []
+            for i, job_url in enumerate(batch_urls, 1):
+                print(f"[Phase 2] {i}/{len(batch_urls)} — {job_url}")
 
-            print(f"[Phase 2] {i}/{len(job_urls)} — {job_url}")
+                record = crawl_job_detail(driver, job_url)
 
-            record = crawl_job_detail(driver, job_url)
+                if record:
+                    dataset.append(record)
+                    # Ghi ngay record vào CSV để không bị mất ngang chừng
+                    append_csv([record], filepath)
+                    
+                    tech_preview = (record["tech_stack"][:40] + "...") if len(record["tech_stack"]) > 40 else (record["tech_stack"] or "N/A")
+                    print(f"  ✔ {record['job_title'][:50]}")
+                    print(f"    tech: {tech_preview}")
+                    print(f"    exp: {record['experience_years'] or 'N/A'} | salary: {record['salary_min']}-{record['salary_max']} {record['currency'] or ''}")
 
-            if record:
-                dataset.append(record)
-                tech_preview = (record["tech_stack"][:40] + "...") if len(record["tech_stack"]) > 40 else (record["tech_stack"] or "N/A")
-                print(f"  ✔ {record['job_title'][:50]}")
-                print(f"    tech: {tech_preview}")
-                print(f"    exp: {record['experience_years'] or 'N/A'} | salary: {record['salary_min']}-{record['salary_max']} {record['currency'] or ''}")
+            print(f"[Batch {batch_num} done] Total jobs so far: {len(dataset)}")
+
+            if start_page + batch_size <= total_pages:
+                # "Đi uống nước" - Nghỉ ngơi giữa các batch lớn để tránh bị đánh giá là bot
+                break_time = random.uniform(10.0, 20.0)
+                print(f"\n[!] Tạm nghỉ {break_time:.1f} giây để tránh anti-bot...")
+                time.sleep(break_time)
 
     except KeyboardInterrupt:
-        print("\n[!] Cắt bởi người dùng (Ctrl+C) — đang lưu dữ liệu đã thu thập...")
+        print(f"\n[!] Ctrl+C — đã lưu {len(dataset)} jobs vào {filepath}")
 
     except Exception as e:
-        print(f"\n[!] Lỗi không mong muốn: {e} — đang lưu dữ liệu đã thu thập...")
+        print(f"\n[!] Lỗi không mong muốn: {e} — đã lưu {len(dataset)} jobs vào {filepath}")
 
     finally:
         try:
             driver.quit()
         except Exception:
             pass
+        print(f"\n[Done] Tổng cộng: {len(dataset)} jobs → {filepath}")
 
-    return dataset
-
-
-# =============================
-# Save CSV
-# =============================
-
-def save_csv(data):
-
-    if not data:
-        print("No data collected")
-        return
-
-    keys = data[0].keys()
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"itviec_jobs_{timestamp}.csv"
-
-    # data/raw cùng cấp với src
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    output_dir = os.path.join(project_root, "data", "raw")
-    os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, filename)
-
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-
-        writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
-        writer.writerows(data)
-
-    print(f"Saved: {len(data)} jobs → {filepath}")
+    return dataset, filepath
 
 
 # =============================
@@ -368,8 +454,7 @@ def save_csv(data):
 
 if __name__ == "__main__":
 
-    jobs = crawl_itviec(20)
-
-    save_csv(jobs)
+    jobs, out_file = crawl_itviec(total_pages=60, batch_size=10)
 
     print("Total jobs:", len(jobs))
+
