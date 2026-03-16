@@ -12,6 +12,7 @@ EXPECTED_COLUMNS = [
     "job_id",
     "source",
     "job_title",
+    "job_title_group",
     "company_name",
     "location",
     "company_type",

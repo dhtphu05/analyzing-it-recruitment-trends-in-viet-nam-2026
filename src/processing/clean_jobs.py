@@ -163,6 +163,26 @@ KNOWN_TECH_COMPANIES = {
     "vpn bank",
 }
 
+JOB_TITLE_GROUP_RULES = [
+    ("Solution Architect", ["solution architect", "architect solution", "application architect", "technical architect", "enterprise architect", "architecture lead", "enterprise architecture"]),
+    ("Product Manager", ["product manager", "product owner", "po ", "product specialist"]),
+    ("Project Manager", ["project manager", "delivery manager", "scrum master", "program manager", "technical pm", "project leader", "delivery lead"]),
+    ("Tech Lead", ["technical lead", "tech lead", "team lead", "leader", "truong phong cong nghe"]),
+    ("Business Analyst", ["business analyst", "ba ", "it ba", "system analyst", "data analyst", "bi analyst", "business intelligence"]),
+    ("Data Scientist/AI Engineer", ["data scientist", "ai engineer", "ai software engineer", "machine learning", "ml engineer", "deep learning", "nlp engineer", "computer vision", "llm", "thi giac may tinh"]),
+    ("Data Engineer", ["data engineer", "etl developer", "etl engineer", "data ware", "big data", "data governance", "quan tri du lieu", "data quality"]),
+    ("DevOps/Cloud Engineer", ["devops", "devsecops", "site reliability", "sre", "cloud engineer", "cloud architect", "cloud consultant", "cloud specialist", "platform engineer", "system engineer", "infrastructure engineer", "system administrator", "system admin", "network administrator", "database administrator", "application operations", "quan ly ha tang"]),
+    ("Security Engineer", ["security engineer", "cyber security", "cybersecurity", "information security", "soc analyst", "penetration tester", "pentest"]),
+    ("QA/Tester", ["qa", "qc", "tester", "test engineer", "automation test", "manual test", "quality assurance"]),
+    ("Mobile Developer", ["android", "ios", "mobile developer", "flutter", "react native", "swift", "kotlin", "xamarin"]),
+    ("Embedded/IoT Engineer", ["embedded", "firmware", "hardware", "iot engineer", "vi mach"]),
+    ("Game Developer", ["game developer", "unity", "unreal"]),
+    ("UI/UX Designer", ["ui ux", "ux ui", "product designer", "ui designer", "ux designer", "graphic designer", "game artist", "3d artist", "2d game artist"]),
+    ("Frontend Developer", ["frontend", "front end", "react developer", "vue developer", "angular developer", "web designer"]),
+    ("Backend Developer", ["backend", "back end", "java developer", "python developer", "php developer", "golang", "go developer", ".net developer", "node.js developer", "nodejs developer", "api developer", "lap trinh vien", "phat trien phan mem", "software developer", "java spring boot"]),
+    ("Full-stack Developer", ["fullstack", "full stack", "full-stack"]),
+]
+
 
 # ---------------------------------------------------------------------------
 # Normalization helpers (dùng utils chung — #10)
@@ -202,6 +222,29 @@ def normalize_remote_option(value: object) -> object:
         return np.nan
     key = slugify_key(text)
     return REMOTE_MAP.get(key, text.lower())
+
+
+def normalize_job_title_group(job_title: object) -> object:
+    text = normalize_text(job_title)
+    if pd.isna(text):
+        return np.nan
+
+    key = f" {slugify_key(text)} "
+
+    for group_name, patterns in JOB_TITLE_GROUP_RULES:
+        if any(pattern in key for pattern in patterns):
+            return group_name
+
+    if "developer" in key or "engineer" in key or "programmer" in key:
+        return "Software Engineer/Developer"
+    if "analyst" in key:
+        return "Business Analyst"
+    if "manager" in key:
+        return "Project Manager"
+    if "designer" in key:
+        return "UI/UX Designer"
+
+    return "Other IT Roles"
 
 
 # (#7) Đổi sang trung bình thay vì max
@@ -432,6 +475,7 @@ def clean_jobs(df: pd.DataFrame) -> pd.DataFrame:
     cleaned["location"] = cleaned["location"].apply(normalize_location)
     cleaned["remote_option"] = cleaned["remote_option"].apply(normalize_remote_option)
     cleaned["experience_years"] = cleaned["experience_years"].apply(parse_experience_years)
+    cleaned["job_title_group"] = cleaned["job_title"].apply(normalize_job_title_group)
 
     cleaned = compute_salary_fields(cleaned)
 
