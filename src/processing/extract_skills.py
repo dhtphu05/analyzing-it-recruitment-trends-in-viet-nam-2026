@@ -231,6 +231,24 @@ MAIN_FRAMEWORK_PRIORITY = ["react", "next.js", "vue", "angular", "node.js", "nes
 
 SEPARATOR_PATTERN = re.compile(r"[,;/|]+")
 TOKEN_CLEAN_PATTERN = re.compile(r"[^a-z0-9+#./\-\s]")
+ENGLISH_REQUIRED_PATTERNS = [
+    re.compile(pattern)
+    for pattern in [
+        r"\benglish\b",
+        r"\bgood english\b",
+        r"\bstrong english\b",
+        r"\bfluent english\b",
+        r"\bbusiness english\b",
+        r"\benglish communication\b",
+        r"\bcommunicat(?:e|ion) in english\b",
+        r"\bwritten and spoken english\b",
+        r"\bspoken english\b",
+        r"\bielts\b",
+        r"\btoeic\b",
+        r"\btoefl\b",
+        r"\bcefr\b",
+    ]
+]
 
 
 def normalize_token(token: str) -> str:
@@ -294,6 +312,11 @@ def extract_skills_from_row(row: pd.Series) -> list[str]:
     return deduped
 
 
+def detect_requires_english(row: pd.Series) -> int:
+    search_text = build_search_text(row)
+    return int(any(pattern.search(search_text) for pattern in ENGLISH_REQUIRED_PATTERNS))
+
+
 def enrich_with_skill_features(df: pd.DataFrame) -> pd.DataFrame:
     enriched = df.copy()
     skill_lists = enriched.apply(extract_skills_from_row, axis=1)
@@ -312,6 +335,7 @@ def enrich_with_skill_features(df: pd.DataFrame) -> pd.DataFrame:
     enriched["main_framework"] = skill_lists.apply(
         lambda items: next((skill for skill in MAIN_FRAMEWORK_PRIORITY if skill in items), pd.NA)
     )
+    enriched["requires_english"] = enriched.apply(detect_requires_english, axis=1)
     enriched["skill_domain"] = enriched.apply(
         lambda row: (
             "Data/AI" if row["has_ai"] or row["has_data"]
