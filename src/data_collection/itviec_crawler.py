@@ -44,7 +44,7 @@ def create_driver():
 
 
 # =============================
-# Salary parser
+# Helpers
 # =============================
 
 def clean_salary(text):
@@ -81,10 +81,6 @@ def clean_salary(text):
     return salary_min, salary_max, currency
 
 
-# =============================
-# Detect remote / onsite
-# =============================
-
 def detect_remote(text):
 
     text = text.lower()
@@ -98,40 +94,58 @@ def detect_remote(text):
     return "onsite"
 
 
-# =============================
-# Extract experience from text
-# =============================
-
 def extract_experience(text):
 
     text = text.lower()
 
-    # Range: "2-3 years" / "2-3 năm"
+    # "2-3 years" / "2-3 năm"
     range_pattern = re.search(r'(\d+)\s*-\s*(\d+)\+?\s*(?:year|năm)', text)
     if range_pattern:
         return f"{range_pattern.group(1)}-{range_pattern.group(2)} years"
 
-    # Plus: "3+ years" / "3+ năm"
+    # "3+ years" / "3+ năm"
     plus_pattern = re.search(r'(\d+)\+\s*(?:year|năm)', text)
     if plus_pattern:
         return f"{plus_pattern.group(1)}+ years"
 
-    # Single: "3 years" / "3 năm"
+    # "3 years" / "3 năm"
     single_pattern = re.search(r'(\d+)\s*(?:year|năm)', text)
     if single_pattern:
         return f"{single_pattern.group(1)} years"
 
     return None
 
+FIELDNAMES = [
+    "job_title", "tech_stack", "experience_years", "location", "company_name",
+    "company_type", "company_industry", "remote_option",
+    "salary_min", "salary_max", "currency",
+    "posted_date", "job_description",
+]
+
+
+def _get_filepath():
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    output_dir = os.path.join(project_root, "data", "raw")
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def append_csv(rows, filepath):
+    """Ghi thêm rows vào filepath. Tạo header nếu file chưa tồn tại."""
+    if not rows:
+        return
+    file_exists = os.path.isfile(filepath)
+    with open(filepath, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerows(rows)
+    print(f"  → Appended {len(rows)} rows → {filepath}")
 
 # =============================
 # Phase 1 — Collect job URLs
 # =============================
-
 def collect_job_urls(driver, start_page=1, pages=10):
-    """
-    Duyệt qua các trang listing từ start_page đến start_page+pages-1, thu thập URLs.
-    """
     all_urls = []
 
     for page in range(start_page, start_page + pages):
@@ -140,7 +154,7 @@ def collect_job_urls(driver, start_page=1, pages=10):
         print(f"[Phase 1] Collecting URLs from page {page}...")
 
         driver.get(url)
-        # Giả lập người dùng chờ từ 1 đến 2 giây lúc mở search list (Nhanh hơn)
+        # Giả lập người dùng chờ từ 1 đến 2 giây lúc mở search list
         time.sleep(random.uniform(1.0, 2.0))
 
         # Cuộn ngẫu nhiên
@@ -207,17 +221,14 @@ def crawl_job_detail(driver, job_url):
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
 
-        # ── title
         title_tag = soup.select_one(".job-show-header h1")
         if not title_tag:
             return None
         job_title = title_tag.text.strip()
 
-        # ── company
         company_tag = soup.select_one(".employer-name")
         company_name = company_tag.text.strip() if company_tag else ""
 
-        # ── company type & industry (từ sidebar employer info)
         company_type = ""
         company_industry = ""
         employer_section = soup.select_one("section.job-show-employer-info")
@@ -232,13 +243,11 @@ def crawl_job_detail(driver, job_url):
                     elif "company industry" in label:
                         company_industry = value
 
-        # ── salary
         salary_container = soup.select_one("div.salary")
         salary_tag = salary_container.select_one("span.ips-2.fw-500") if salary_container else None
         salary_text = salary_tag.text.strip() if salary_tag else ""
         salary_min, salary_max, currency = clean_salary(salary_text)
 
-        # ── remote/work type — "At office" / "Hybrid" / "Remote"
         remote_option = "onsite"
         posted_date = datetime.now().strftime("%Y-%m-%d")
         for item in soup.select(".preview-header-item"):
@@ -246,36 +255,21 @@ def crawl_job_detail(driver, job_url):
             if not span:
                 continue
             span_text = span.text.strip()
-            # ── posted date
             if "posted" in span_text.lower():
                 days_match = re.search(r"(\d+)\s*day", span_text.lower())
                 if days_match:
                     posted_date = (datetime.now() - timedelta(days=int(days_match.group(1)))).strftime("%Y-%m-%d")
-                # minutes / hours ago → hôm nay (giữ nguyên posted_date = today)
             else:
                 remote_option = detect_remote(span_text)
 
-        # ── location — địa chỉ cụ thể (hoặc thành phố)
         location = ""
         for div in soup.select("div.d-inline-block.text-dark-grey"):
             span = div.select_one("span.normal-text.text-rich-grey")
             if span and not div.select_one(".preview-header-item"):
                 full_location = span.text.strip()
-                # Lấy phần text cuối cùng sau dấu phẩy (thường là Tỉnh/Thành phố)
                 location = full_location.split(",")[-1].strip()
                 break
-        # Fallback: lấy từ job-by-city trong data-layer attribute
-        if not location:
-            apply_btn = soup.select_one("a[data-jobs--data-layer-params-value]")
-            if apply_btn:
-                import json
-                try:
-                    params = json.loads(apply_btn.get("data-jobs--data-layer-params-value", "{}"))
-                    location = params.get("job_by_city", "")
-                except Exception:
-                    pass
 
-        # ── tech_stack (Skills section trên trang JD)
         tech_stack = ""
         for section in soup.select("div.imb-4.imb-xl-3"):
             label = section.select_one("div.w-xl-fixed-100")
@@ -285,28 +279,14 @@ def crawl_job_detail(driver, job_url):
                 tech_stack = ", ".join(skills)
                 break
 
-        # Fallback nếu không tìm thấy section Skills:
-        if not tech_stack:
-            apply_btn = soup.select_one("a[data-jobs--data-layer-params-value]")
-            if apply_btn:
-                import json
-                try:
-                    params = json.loads(apply_btn.get("data-jobs--data-layer-params-value", "{}"))
-                    tech_stack = params.get("job_required_skill", "")
-                except Exception:
-                    pass
-
-        # ── experience — tìm trong section "Your skills and experience"
         experience_years = None
         job_description = ""
         for h2 in soup.select("section.job-content h2"):
             h2_text = h2.get_text().lower()
-            # experience
             if "experience" in h2_text:
                 container = h2.find_parent("div")
                 text = container.get_text() if container else h2.get_text()
                 experience_years = extract_experience(text)
-            # job description
             if "job description" in h2_text:
                 container = h2.find_parent("div")
                 if container:
@@ -334,52 +314,6 @@ def crawl_job_detail(driver, job_url):
 
 
 # =============================
-# Save helpers
-# =============================
-
-FIELDNAMES = [
-    "job_title", "tech_stack", "experience_years", "location", "company_name",
-    "company_type", "company_industry", "remote_option",
-    "salary_min", "salary_max", "currency",
-    "posted_date", "job_description",
-]
-
-
-def _get_output_dir():
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    output_dir = os.path.join(project_root, "data", "raw")
-    os.makedirs(output_dir, exist_ok=True)
-    return output_dir
-
-
-def append_csv(rows, filepath):
-    """Ghi thêm rows vào filepath. Tạo header nếu file chưa tồn tại."""
-    if not rows:
-        return
-    file_exists = os.path.isfile(filepath)
-    with open(filepath, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        if not file_exists:
-            writer.writeheader()
-        writer.writerows(rows)
-    print(f"  → Appended {len(rows)} rows → {filepath}")
-
-
-def save_csv(data):
-    """Lưu toàn bộ data vào file mới (dùng khi gọi độc lập)."""
-    if not data:
-        print("No data collected")
-        return
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(_get_output_dir(), f"itviec_jobs_{timestamp}.csv")
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(data)
-    print(f"Saved: {len(data)} jobs → {filepath}")
-
-
-# =============================
 # Main crawler
 # =============================
 
@@ -389,13 +323,12 @@ def crawl_itviec(total_pages=60, batch_size=10):
     dataset = []
     seen_urls = set()
 
-    # Tạo 1 filepath cố định cho toàn bộ run
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(_get_output_dir(), f"itviec_jobs_{timestamp}.csv")
+    filepath = os.path.join(_get_filepath(), f"itviec_jobs_{timestamp}.csv")
     print(f"[Output] {filepath}\n")
 
     try:
-        for start_page in range(41, total_pages + 1, batch_size):
+        for start_page in range(1, total_pages + 1, batch_size):
             batch_num = (start_page - 1) // batch_size + 1
             print(f"\n{'='*60}")
             print(f"[Batch {batch_num}] Pages {start_page} → {start_page + batch_size - 1}")
@@ -416,7 +349,6 @@ def crawl_itviec(total_pages=60, batch_size=10):
 
                 if record:
                     dataset.append(record)
-                    # Ghi ngay record vào CSV để không bị mất ngang chừng
                     append_csv([record], filepath)
                     
                     tech_preview = (record["tech_stack"][:40] + "...") if len(record["tech_stack"]) > 40 else (record["tech_stack"] or "N/A")
@@ -427,7 +359,7 @@ def crawl_itviec(total_pages=60, batch_size=10):
             print(f"[Batch {batch_num} done] Total jobs so far: {len(dataset)}")
 
             if start_page + batch_size <= total_pages:
-                # "Đi uống nước" - Nghỉ ngơi giữa các batch lớn để tránh bị đánh giá là bot
+                # break time giữa các batch lớn để tránh bị đánh giá là bot
                 break_time = random.uniform(10.0, 20.0)
                 print(f"\n[!] Tạm nghỉ {break_time:.1f} giây để tránh anti-bot...")
                 time.sleep(break_time)

@@ -136,7 +136,7 @@ def collect_job_urls(driver, start_page=1, pages=5):
         print(f"[Phase 1] Page {page}: {url}")
 
         driver.get(url)
-        # Giả lập người dùng chờ từ 1 đến 2 giây lúc mở search list (Nhanh hơn)
+        # Giả lập người dùng chờ từ 1 đến 2 giây lúc mở search list 
         time.sleep(random.uniform(1.0, 2.0))
         
         # Cuộn ngẫu nhiên
@@ -210,7 +210,6 @@ def crawl_job_detail(driver, job_url):
 
     title_tag = body.select_one("h1.job-detail__info--title")
     job_title = title_tag.get_text(" ", strip=True) if title_tag else ""
-
     salary_tag = body.select_one(".section-salary .job-detail__info--section-content-value")
     salary_text = salary_tag.text.strip() if salary_tag else ""
     salary_min, salary_max, currency = clean_salary(salary_text)
@@ -285,15 +284,16 @@ def crawl_topcv(total_pages=12, batch_size=2):
 
     try:
         end_page = 1 + total_pages
-        for start_page in range(3, end_page, batch_size):
+        for start_page in range(1, end_page, batch_size):
             batch_num = (start_page - 1) // batch_size + 1
             print(f"\n{'='*60}")
             print(f"[Batch {batch_num}] Pages {start_page} → {start_page + batch_size - 1}")
             print(f"{'='*60}")
 
+            # Phase 1: thu thập URLs và crawl ngày đăng job cho batch này
             url_records_raw = collect_job_urls(driver, start_page=start_page, pages=batch_size)
             
-            # Khử trùng lặp giữa các batch
+            # Loại bỏ trùng lặp giữa các batch
             url_records = []
             for r in url_records_raw:
                 if r["job_url"] not in seen_urls:
@@ -341,7 +341,7 @@ def crawl_topcv(total_pages=12, batch_size=2):
             print(f"[Batch {batch_num} done] Total jobs so far: {len(dataset)}")
 
             if start_page + batch_size <= total_pages:
-                # "Đi uống nước" - Nghỉ ngơi giữa các batch lớn để tránh bị đánh giá là bot
+                # break time giữa các batch lớn để tránh bị đánh giá là bot
                 break_time = random.uniform(10.0, 20.0)
                 print(f"\n[!] Tạm nghỉ {break_time:.1f} giây để tránh anti-bot...")
                 time.sleep(break_time)
@@ -361,7 +361,7 @@ def crawl_topcv(total_pages=12, batch_size=2):
 
 
 # =============================
-# ENTRY POINT
+# Run crawler
 # =============================
 
 if __name__ == "__main__":
