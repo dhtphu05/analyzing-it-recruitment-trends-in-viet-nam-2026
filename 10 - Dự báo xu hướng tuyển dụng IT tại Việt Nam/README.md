@@ -13,23 +13,22 @@ Các file chính trong bài làm:
 - `src/data_collection/topcv_crawler.py`: mã crawl TopCV
 - `src/processing/clean_jobs.py`: làm sạch và chuẩn hóa dữ liệu
 - `src/processing/extract_skills.py`: trích xuất skill và tạo feature
-- `data/raw/`: dữ liệu thô sau khi crawl
-- `data/clean-data/`: dữ liệu sau khi làm sạch và tạo feature
+- `raw data/`: dữ liệu thô sau khi crawl
+- `clean data/`: dữ liệu sau khi làm sạch và tạo feature
 
 Nếu muốn chạy lại, có thể tạo môi trường và cài thư viện:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-pip install matplotlib seaborn scikit-learn nbformat nbclient ipykernel
+pip install pandas beautifulsoup4 requests selenium webdriver-manager matplotlib seaborn scikit-learn nbformat nbclient ipykernel plotly
 ```
 
 Nếu muốn tạo lại file clean và feature:
 
 ```bash
-python3 src/processing/clean_jobs.py --input-dir "data/raw" --output "data/clean-data/jobs_cleaned.csv"
-python3 src/processing/extract_skills.py --input "data/clean-data/jobs_cleaned.csv" --output "data/clean-data/jobs_features.csv"
+python3 src/processing/clean_jobs.py --input-dir "raw data" --output "clean data/jobs_cleaned.csv"
+python3 src/processing/extract_skills.py --input "clean data/jobs_cleaned.csv" --output "clean data/jobs_features.csv"
 ```
 
 Sau đó mở notebook:
@@ -39,4 +38,3 @@ jupyter notebook description.ipynb
 ```
 
 Trong notebook hiện có các phần chính như: phát biểu bài toán, mô tả dữ liệu, cleaning, feature engineering, trực quan hóa đơn biến và đa biến, t-SNE, kết luận về tính khả thi của dữ liệu, và một phần ngắn khảo sát tập con có lương.
-
